@@ -6,7 +6,6 @@ It checks the following items:
 * RAID (Volumes) status
 * DSM update status
 * Temperatures
-* Storage usage
 * UPS informations
 
 ## Requirements
@@ -21,11 +20,8 @@ options:
 
 -2 [community name]   Use SNMPv2 (no need user/password) & define community name (default public)
 
--W [warning temp] Warning temperature (for disks & synology) (default 50)
--C [critical temp] Critical temperature (for disks & synology) (default 60)
-
--w [warning %] Warning storage usage percentage (default 80)
--c [critical %] Critical storage usage percentage (default 95)
+-w [warning temp] Warning temperature (for disks & synology) (default 50)
+-c [critical temp] Critical temperature (for disks & synology) (default 60)
 
 -U Show informations about the connected UPS (default no)
 -f PerfData - print performance data for temperature and storage usage percentage (default no)

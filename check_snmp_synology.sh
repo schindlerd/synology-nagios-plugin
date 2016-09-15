@@ -1,9 +1,6 @@
 #!/bin/bash
 #
 #
-# check_website_by_selenium.sh
-# Description : Checks a website using the Selenium Grid
-#
 # The MIT License (MIT)
 # 
 # Copyright (c) 2016, Roland Rickborn (roland.rickborn@exensio.de)
@@ -41,7 +38,6 @@
 # - DSM update status
 # - Temperature Warning and Critical
 # - UPS information
-# - Storage percentage of use
 #
 # Tested with DSM 5.0, 5.1 & 5.2
 #---------------------------------------------------
@@ -116,11 +112,8 @@ usage()
         echo ""
         echo "            -2 [community name]   Use SNMPv2 (no need user/password) & define community name (default $SNMPV2Community)"
         echo ""
-        echo "            -W [warning temp]     Warning temperature (for disks & synology) (default $warningTemperature)"
-        echo "            -C [critical temp]    Critical temperature (for disks & synology) (default $criticalTemperature)"
-        echo ""
-        echo "            -w [warning %]        Warning storage usage percentage (default $warningStorage)"
-        echo "            -c [critical %]       Critical storage usage percentage (default $criticalStorage)"
+        echo "            -w [warning temp]     Warning temperature (for disks & synology) (default $warningTemperature)"
+        echo "            -c [critical temp]    Critical temperature (for disks & synology) (default $criticalTemperature)"
         echo ""
         echo "            -U Show informations about the connected UPS (default no)"
         echo "            -v Verbose - print all informations about your Synology (default $verbose)"
@@ -139,7 +132,7 @@ if [ "$1" == "--help" ]; then
     exit 0
 fi
 
-while getopts 2:W:C:w:c:u:p:h:Uvfd OPTNAME;
+while getopts 2:w:c:u:p:h:Uvfd OPTNAME;
 do
     case "$OPTNAME" in
         u)  SNMPUser="$OPTARG";;
@@ -148,10 +141,8 @@ do
         v)  verbose="yes";;
         2)  SNMPVersion="2"
             SNMPV2Community="$OPTARG";;
-        w)  warningStorage="$OPTARG";;
-        c)  criticalStorage="$OPTARG";;
-        W)  warningTemperature="$OPTARG";;
-        C)  criticalTemperature="$OPTARG";;
+        w)  warningTemperature="$OPTARG";;
+        c)  criticalTemperature="$OPTARG";;
         U)  ups="yes";;
         f)  perfData="yes";;
         d)  dsmcheck="yes";;
@@ -341,38 +332,6 @@ else
         RAIDName[$i]=$(echo "$syno" | grep $OID_RAIDName.$(($i-1)) | cut -d "=" -f2)
         RAIDStatus[$i]=$(echo "$syno" | grep $OID_RAIDStatus.$(($i-1)) | cut -d "=" -f2 | sed 's/^[ \t]*//;s/[ \t]*$//')
 
-        storageName[$i]=$(echo "${RAIDName[$i]}" | sed -e 's/[[:blank:]]//g' | sed -e 's/\"//g' | sed 's/.*/\L&/')
-
-		syno_diskDescr=`$SNMPWALK $SNMPArgs $hostname $OID_Storage.3 2> /dev/null`
-
-		storageID[$i]=$(echo "$syno_diskDescr" | grep -Eo ".[0-9]* = \"\/${storageName[$i]}\" *" | cut -d "." -f2 | cut -d " " -f1)
-
-        if [ "${storageID[$i]}" != "" ] ; then
-		    storageSize[$i]=`$SNMPGET $SNMPArgs $hostname $OID_StorageSize.${storageID[$i]} | cut -d "=" -f2`
-
-		    storageSizeUsed[$i]=`$SNMPGET $SNMPArgs $hostname $OID_StorageSizeUsed.${storageID[$i]} | cut -d "=" -f2`
-
-	  	    storageAllocationUnits[$i]=`$SNMPGET $SNMPArgs $hostname $OID_StorageAllocationUnits.${storageID[$i]} | cut -d "=" -f2`
-
-            storagePercentUsed[$i]=$((${storageSizeUsed[$i]} * 100 / ${storageSize[$i]}))
-            storagePercentUsedString[$i]="${storagePercentUsed[$i]}% used"
-
-            #Store perfData
-            perfDataStorageString="$perfDataStorageString 'Raid $i Usage'=${storagePercentUsed[$i]};$warningStorage;$criticalStorage;0" ;
-
-            if [ "${storagePercentUsed[$i]}" -gt "$warningStorage" ] ; then
-                if [ "${storagePercentUsed[$i]}" -gt "$criticalStorage" ] ; then
-                    healthCriticalStatus=1;
-                    storagePercentUsedString[$i]="${storagePercentUsedString[$i]} CRITICAL"
-                    healthString="$healthString,${RAIDName[$i]}: ${storagePercentUsedString[$i]}"
-                else
-                    healthWarningStatus=1;
-                    storagePercentUsedString[$i]="${storagePercentUsedString[$i]} WARNING"
-                    healthString="$healthString,${RAIDName[$i]}: ${storagePercentUsedString[$i]}"
-                fi
-            fi
-        fi
-
         case ${RAIDStatus[$i]} in
             "1")    RAIDStatus[$i]="Normal";    ;;
             "2")    RAIDStatus[$i]="Repairing";        healthWarningStatus=1;        healthString="$healthString, RAID status (${RAIDName[$i]}): ${RAIDStatus[$i]} ";;
@@ -407,7 +366,7 @@ else
         echo "Number of RAID volume:   $nbRAID" ;
         for i in `seq 1 $nbRAID`;
         do
-            echo " ${RAIDName[$i]} status:${RAIDStatus[$i]} ${storagePercentUsedString[$i]}" ;
+            echo " ${RAIDName[$i]} status:${RAIDStatus[$i]}" ;
         done
 
         # Display UPS information
@@ -444,15 +403,15 @@ else
         exit 0
     fi
         if [ "$healthCriticalStatus" = "1" ] && [ "$perfData" == "yes"  ] ; then
-        echo "CRITICAL - $healthString | $perfDataTempString $perfDataStorageString"
+        echo "CRITICAL - $healthString | $perfDataTempString"
         exit 2
     fi
     if [ "$healthWarningStatus" = "1" ] && [ "$perfData" == "yes"  ] ; then
-        echo "WARNING - $healthString | $perfDataTempString $perfDataStorageString"
+        echo "WARNING - $healthString | $perfDataTempString"
         exit 1
     fi
     if [ "$healthCriticalStatus" = "0" ] && [ "$healthWarningStatus" = "0" ] && [ "$perfData" == "yes"  ] ; then
-        echo "OK - $healthString is in good health | $perfDataTempString $perfDataStorageString"
+        echo "OK - $healthString is in good health | $perfDataTempString"
         exit 0
     fi
 fi
